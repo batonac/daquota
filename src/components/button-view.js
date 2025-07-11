@@ -18,164 +18,188 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-Vue.component('button-view', {
-    extends: editableComponent,
-    template: `
-        <b-button 
-            :id="cid" 
-            ref="button"
-            :href="$eval(viewModel.href, null)"
-            :to="$eval(viewModel.to, null)"
-            :type="viewModel.buttonType" 
-            :variant="variant()" 
-            :pill="$eval(viewModel.pill, false)" 
-            :squared="$eval(viewModel.squared, false)" 
-            :disabled="$eval(viewModel.disabled, false)" 
-            :block="$eval(viewModel.block, null)"
-            :size="$eval(viewModel.size, null)"
-            :class="$eval(viewModel.class, null)"
-            :style="$eval(viewModel.style, null)"
-            :draggable="$eval(viewModel.draggable, false) ? true : false" 
-            :target="$eval(viewModel.openLinkInNewWindow, null) ? '_blank' : undefined"
-            v-on="boundEventHandlers({'click': onClick})"
-        >
-            <div v-if="$eval(viewModel.icon, null) && $eval(viewModel.label, null)"
-                :style="{ display: 'flex', flexDirection: iconPositionMapper[$eval(viewModel.iconPosition, 'left')], justifyContent: 'center', alignItems: 'center', gap: '0.4rem' }">
-                <b-icon :icon="$eval(viewModel.icon)"></b-icon>
-                <div v-if="$eval(viewModel.label, null)" v-html="$eval(viewModel.label, '#error#')"/>
-            </div>
-            <div v-else-if="$eval(viewModel.icon, null)">
-                <b-icon :icon="$eval(viewModel.icon)"></b-icon>
-            </div>
-            <div v-else v-html="$eval(viewModel.label, '#error#')"/>
-        </b-button>
-    `,
-    data: function() {
-        return {
-            iconPositionMapper: {
-                'left': 'row',
-                'right': 'row-reverse',
-                'top': 'column',
-                'bottom': 'column-reverse'
-            }
-        }
-    },
-    watch: {
-        'viewModel.buttonType': {
-            handler: function() {
-                this.$emit('error');
-                const parentForm = this.findParent(viewModel => viewModel.type === 'ContainerView' && viewModel.form);
-                if (this.viewModel.buttonType === 'submit' || this.viewModel.buttonType === 'reset') {
-                    if (!parentForm) {
-                        this.$emit('error', 'This ' + this.viewModel.buttonType + ' button is not part of a form. Please make sure to switch a parent container in form mode to handle from events properly.');
-                    }
-                }
-                if (parentForm) {
-                    parentForm.check();
-                }
-            }
-        }
-    },
-    methods: {
-        variant() {
-            // background color will override variant
-            const classes = this.$eval(this.viewModel.class, null);
-            if (!classes || classes.indexOf('bg-') === -1) {
-                return this.$eval(this.viewModel.variant, null);
-            } else {
-                return 'none';
-            }
-        },
-        customActionNames() {
-            return [
-                {value: 'focus', text: 'focus()'}
-            ];
-        },
-        focus() {
-            this.$refs['button'].focus()
-        },
-        propNames() {
-            return [
-                "cid",
-                "dataSource",
-                "field",
-                "label",
-                "icon",
-                "iconPosition",
-                "href",
-                "openLinkInNewWindow",
-                "to",
-                "buttonType",
-                "variant",
-                "size",
-                "pill",
-                "squared",
-                "block",
-                "disabled",
-                "eventHandlers"
-            ];
-        },
-        customPropDescriptors() {
-            return {
-                buttonType: {
-                    type: 'select',
-                    label: 'Type',
-                    literalOnly: true,
-                    editable: true,
-                    options: [
-                        'button', 'submit', 'reset'
-                    ]
-                },
-                variant: {
-                    type: 'select',
-                    editable: true,
-                    options: [
-                        "primary", "secondary", "success", "danger", "warning", "info", "light", "dark",
-                        "outline-primary", "outline-secondary", "outline-success", "outline-danger", "outline-warning", "outline-info", "outline-light", "outline-dark",
-                        "link"
-                    ]
-                },
-                size: {
-                    type: 'select',
-                    editable: true,
-                    options: ['default', 'sm', 'lg']
-                },
-                icon: {
-                    type: 'icon',
-                    editable: true
-                },
-                iconPosition: {
-                    type: 'select',
-                    editable: true,
-                    options: ['left', 'right', 'top', 'bottom']
-                },
-                openLinkInNewWindow: {
-                    type: 'checkbox',
-                    editable: (viewModel) => !!viewModel.href
-                },
-                pill: {
-                    type: 'checkbox',
-                    editable: true,
-                    category: 'style'
-                },
-                squared: {
-                    type: 'checkbox',
-                    editable: true,
-                    category: 'style'
-                },
-                block: {
-                    type: 'checkbox',
-                    editable: true,
-                    category: 'style'
-                },
-                disabled: {
-                    type: 'checkbox',
-                    editable: true
-                }
-            }
-        }
+// DDOM Button View Component
+export default {
+    tagName: 'button',
+    
+    // Reactive properties
+    $label: '',
+    $icon: null,
+    $iconPosition: 'left',
+    $href: null,
+    $to: null,
+    $buttonType: 'button',
+    $variant: 'primary',
+    $size: null,
+    $pill: false,
+    $squared: false,
+    $block: false,
+    $disabled: false,
+    $openLinkInNewWindow: false,
+    $draggable: false,
+    $class: null,
+    $style: null,
+    $field: null,
+    $dataSource: null,
 
+    // Computed properties
+    $displayText: function() {
+        return this.$label.get() || '#error#';
+    },
+
+    $classList: function() {
+        const classes = ['btn'];
+        const variant = this.$variant.get();
+        const size = this.$size.get();
+        const customClass = this.$class.get();
+        
+        // Don't apply variant if custom bg- class is present
+        if (!customClass || customClass.indexOf('bg-') === -1) {
+            if (variant && variant !== 'none') {
+                classes.push(`btn-${variant}`);
+            }
+        }
+        
+        if (size && size !== 'default') {
+            classes.push(`btn-${size}`);
+        }
+        
+        if (this.$pill.get()) classes.push('btn-pill');
+        if (this.$squared.get()) classes.push('btn-squared'); 
+        if (this.$block.get()) classes.push('btn-block');
+        if (customClass) classes.push(customClass);
+        
+        return classes.join(' ');
+    },
+
+    $hasIcon: function() {
+        return !!this.$icon.get();
+    },
+
+    $hasLabel: function() {
+        return !!this.$label.get();
+    },
+
+    $iconFlexDirection: function() {
+        const position = this.$iconPosition.get();
+        const mapper = {
+            'left': 'row',
+            'right': 'row-reverse', 
+            'top': 'column',
+            'bottom': 'column-reverse'
+        };
+        return mapper[position] || 'row';
+    },
+
+    $renderIcon: function() {
+        const icon = this.$icon.get();
+        return icon ? `<i class="icon-${icon}"></i>` : '';
+    },
+
+    $contentHTML: function() {
+        const hasIcon = this.$hasIcon();
+        const hasLabel = this.$hasLabel();
+        const iconHTML = this.$renderIcon();
+        const labelHTML = this.$displayText();
+        
+        if (hasIcon && hasLabel) {
+            return `<div style="display: flex; flex-direction: ${this.$iconFlexDirection()}; justify-content: center; align-items: center; gap: 0.4rem;">
+                ${iconHTML}
+                <div>${labelHTML}</div>
+            </div>`;
+        } else if (hasIcon) {
+            return iconHTML;
+        } else {
+            return labelHTML;
+        }
+    },
+
+    // Component structure
+    attributes: {
+        'type': '${this.$buttonType}',
+        'class': '${this.$classList}',
+        'style': '${this.$style}',
+        'disabled': function() { return this.$disabled.get() || null; },
+        'draggable': '${this.$draggable}',
+        'href': '${this.$href}',
+        'target': function() { return this.$openLinkInNewWindow.get() ? '_blank' : null; },
+        'data-field': '${this.$field}'
+    },
+
+    innerHTML: '${this.$contentHTML}',
+
+    // Event handlers
+    onclick: function() {
+        // Custom click handler - will be bound by the framework
+        this.handleClick?.();
+    },
+
+    // Methods
+    focus: function() {
+        this.element?.focus();
+    },
+
+    // Property descriptors for the editor
+    propertyDescriptors: {
+        buttonType: {
+            type: 'select',
+            label: 'Type',
+            literalOnly: true,
+            editable: true,
+            options: ['button', 'submit', 'reset']
+        },
+        variant: {
+            type: 'select',
+            editable: true,
+            options: [
+                "primary", "secondary", "success", "danger", "warning", "info", "light", "dark",
+                "outline-primary", "outline-secondary", "outline-success", "outline-danger", 
+                "outline-warning", "outline-info", "outline-light", "outline-dark", "link"
+            ]
+        },
+        size: {
+            type: 'select',
+            editable: true,
+            options: ['default', 'sm', 'lg']
+        },
+        icon: {
+            type: 'icon',
+            editable: true
+        },
+        iconPosition: {
+            type: 'select',
+            editable: true,
+            options: ['left', 'right', 'top', 'bottom']
+        },
+        openLinkInNewWindow: {
+            type: 'checkbox',
+            editable: function() { return !!this.$href.get(); }
+        },
+        pill: {
+            type: 'checkbox',
+            editable: true,
+            category: 'style'
+        },
+        squared: {
+            type: 'checkbox',
+            editable: true,
+            category: 'style'
+        },
+        block: {
+            type: 'checkbox',
+            editable: true,
+            category: 'style'
+        },
+        disabled: {
+            type: 'checkbox',
+            editable: true
+        },
+        label: {
+            type: 'text',
+            editable: true,
+            label: 'Button Label'
+        }
     }
-});
+};
 
 
