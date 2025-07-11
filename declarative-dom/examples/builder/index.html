@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Declarative DOM Builder</title>
+    <script type="module" src="../../lib/dist/index.js"></script>
+    <script type="module">
+        import builderConfig from './index.js';
+
+        // Wait for DDOM to be available
+        window.addEventListener('load', () => {
+            // createElement the builder interface
+            DDOM.adoptWindow(builderConfig);
+
+            // Initialize the builder
+            if (builderConfig.oncreateElement) {
+                builderConfig.oncreateElement.call(builderConfig);
+            }
+        });
+    </script>
+</head>
+
+<body>
+</body>
+
+</html>
