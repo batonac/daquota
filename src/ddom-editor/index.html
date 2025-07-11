@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDOM Editor - Daquota</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #f5f5f5;
+        }
+        .editor-container {
+            display: flex;
+            gap: 20px;
+            height: calc(100vh - 40px);
+        }
+        .editor-panel {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .preview-panel {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: auto;
+        }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.secondary:hover {
+            background: #545b62;
+        }
+        textarea {
+            width: 100%;
+            height: 70%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-container">
+        <div class="editor-panel">
+            <h2>DDOM Object Editor</h2>
+            <div class="toolbar">
+                <button onclick="loadExample()">Load Example</button>
+                <button onclick="importFromJson()">Import JSON</button>
+                <button onclick="exportToJsesc()" class="secondary">Export jsesc</button>
+                <button onclick="clearEditor()" class="secondary">Clear</button>
+            </div>
+            <textarea id="ddom-editor" placeholder="Enter your DDOM object here..."></textarea>
+            <div id="editor-status"></div>
+        </div>
+        
+        <div class="preview-panel">
+            <h2>Live Preview</h2>
+            <div class="toolbar">
+                <button onclick="renderPreview()">Render Preview</button>
+                <button onclick="clearPreview()" class="secondary">Clear Preview</button>
+            </div>
+            <div id="preview-container"></div>
+            <div id="preview-status"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import DDOM from '../../declarative-dom/lib/dist/index.js';
+        import jsesc from '../../node_modules/jsesc/jsesc.js';
+        
+        // Make globals available for HTML event handlers
+        window.DDOM = DDOM;
+        window.jsesc = jsesc;
+        
+        // Example DDOM object
+        const exampleDdom = {
+            $count: 0,
+            $message: 'Hello DDOM!',
+            
+            document: {
+                body: {
+                    children: [
+                        {
+                            tagName: 'h1',
+                            textContent: '${this.$message}'
+                        },
+                        {
+                            tagName: 'p',
+                            textContent: 'Counter: ${this.$count}'
+                        },
+                        {
+                            tagName: 'button',
+                            textContent: 'Increment',
+                            onclick: function() {
+                                this.$count.set(this.$count.get() + 1);
+                            }
+                        },
+                        {
+                            tagName: 'button',
+                            textContent: 'Change Message',
+                            onclick: function() {
+                                this.$message.set('Message changed at ' + new Date().toLocaleTimeString());
+                            },
+                            style: {
+                                marginLeft: '10px'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+        
+        window.loadExample = function() {
+            const editor = document.getElementById('ddom-editor');
+            editor.value = JSON.stringify(exampleDdom, null, 2);
+            showStatus('editor-status', 'Example loaded successfully!', 'success');
+        }
+        
+        window.importFromJson = function() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const content = e.target.result;
+                            const obj = JSON.parse(content);
+                            document.getElementById('ddom-editor').value = JSON.stringify(obj, null, 2);
+                            showStatus('editor-status', 'File imported successfully!', 'success');
+                        } catch (error) {
+                            showStatus('editor-status', 'Error importing file: ' + error.message, 'error');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+        
+        window.exportToJsesc = function() {
+            try {
+                const editor = document.getElementById('ddom-editor');
+                const ddomObj = JSON.parse(editor.value);
+                
+                // Convert to JavaScript code using jsesc
+                const jsCode = 'const ddomObject = ' + jsesc(ddomObj, {
+                    es6: true,
+                    indent: '  ',
+                    compact: false
+                }) + ';';
+                
+                // Download as .js file
+                const blob = new Blob([jsCode], { type: 'text/javascript' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'ddom-object.js';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                showStatus('editor-status', 'DDOM object exported as JavaScript!', 'success');
+            } catch (error) {
+                showStatus('editor-status', 'Export error: ' + error.message, 'error');
+            }
+        }
+        
+        window.clearEditor = function() {
+            document.getElementById('ddom-editor').value = '';
+            showStatus('editor-status', 'Editor cleared', 'success');
+        }
+        
+        window.renderPreview = function() {
+            try {
+                const editor = document.getElementById('ddom-editor');
+                const ddomObj = JSON.parse(editor.value);
+                
+                // Clear previous preview
+                const container = document.getElementById('preview-container');
+                container.innerHTML = '';
+                
+                // Create a new DDOM instance
+                const app = DDOM(ddomObj);
+                
+                showStatus('preview-status', 'Preview rendered successfully!', 'success');
+            } catch (error) {
+                showStatus('preview-status', 'Render error: ' + error.message, 'error');
+            }
+        }
+        
+        window.clearPreview = function() {
+            document.getElementById('preview-container').innerHTML = '';
+            showStatus('preview-status', 'Preview cleared', 'success');
+        }
+        
+        function showStatus(elementId, message, type) {
+            const statusEl = document.getElementById(elementId);
+            statusEl.className = type;
+            statusEl.textContent = message;
+            setTimeout(() => {
+                statusEl.textContent = '';
+                statusEl.className = '';
+            }, 3000);
+        }
+        
+        // Load example on page load
+        window.addEventListener('load', () => {
+            loadExample();
+        });
+    </script>
+</body>
+</html>
