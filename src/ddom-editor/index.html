@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daquota DDOM IDE</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #f5f5f5;
+        }
+        .ide-container {
+            display: flex;
+            gap: 20px;
+            height: calc(100vh - 40px);
+        }
+        .editor-panel {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .preview-panel {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: auto;
+        }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.secondary:hover {
+            background: #545b62;
+        }
+        #ddomEditor {
+            flex: 1;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 16px;
+            background: #f8f9fa;
+            outline: none;
+            resize: none;
+            tab-size: 2;
+        }
+        .error {
+            color: #dc3545;
+            padding: 10px;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .success {
+            color: #155724;
+            padding: 10px;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #555;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="ide-container">
+        <div class="editor-panel">
+            <h1>Daquota DDOM IDE</h1>
+            <div class="toolbar">
+                <button onclick="loadExample()">Load Example</button>
+                <button onclick="newApplication()">New Application</button>
+                <button onclick="exportAsJavaScript()" class="secondary">Export JS</button>
+                <button onclick="validateDDOM()" class="secondary">Validate</button>
+            </div>
+            <textarea id="ddomEditor" placeholder="Enter your DDOM application code here..."></textarea>
+            <div id="validationResult"></div>
+        </div>
+        <div class="preview-panel">
+            <h2>Live Preview</h2>
+            <div id="previewArea">
+                <p>Your DDOM application will appear here when you validate and preview your code.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include jsesc for JavaScript export -->
+    <script src="https://cdn.jsdelivr.net/npm/jsesc@3.0.2/jsesc.min.js"></script>
+    
+    <script>
+        const editor = document.getElementById('ddomEditor');
+        const validationResult = document.getElementById('validationResult');
+        const previewArea = document.getElementById('previewArea');
+
+        // Load example DDOM application
+        function loadExample() {
+            const exampleDDOM = `/*
+ * Simple Todo Application - DDOM Format
+ */
+
+export default {
+  // Application state
+  $todos: [
+    { id: 1, text: 'Learn DDOM', completed: false },
+    { id: 2, text: 'Build an app', completed: false }
+  ],
+  $newTodoText: '',
+  
+  // Computed properties
+  $todoCount: function() {
+    return this.$todos.get().length;
+  },
+  
+  $completedCount: function() {
+    return this.$todos.get().filter(todo => todo.completed).length;
+  },
+
+  document: {
+    head: {
+      title: 'DDOM Todo App'
+    },
+    body: {
+      style: {
+        fontFamily: 'system-ui, sans-serif',
+        padding: '2em',
+        maxWidth: '600px',
+        margin: '0 auto'
+      },
+      children: [
+        {
+          tagName: 'h1',
+          textContent: 'DDOM Todo App',
+          style: { color: '#333', marginBottom: '1em' }
+        },
+        {
+          tagName: 'div',
+          style: { marginBottom: '1em' },
+          children: [
+            {
+              tagName: 'input',
+              attributes: {
+                type: 'text',
+                placeholder: 'Add a new todo...',
+                value: '\${window.$newTodoText}'
+              },
+              style: {
+                padding: '0.5em',
+                borderRadius: '4px',
+                border: '1px solid #ddd',
+                marginRight: '0.5em'
+              },
+              oninput: function(e) {
+                $newTodoText.set(e.target.value);
+              }
+            },
+            {
+              tagName: 'button',
+              textContent: 'Add Todo',
+              style: {
+                padding: '0.5em 1em',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              },
+              onclick: function() {
+                const text = $newTodoText.get().trim();
+                if (text) {
+                  const todos = $todos.get();
+                  const newId = Math.max(...todos.map(t => t.id), 0) + 1;
+                  $todos.set([...todos, { id: newId, text, completed: false }]);
+                  $newTodoText.set('');
+                }
+              }
+            }
+          ]
+        },
+        {
+          tagName: 'div',
+          textContent: 'Total: \${window.$todoCount} | Completed: \${window.$completedCount}',
+          style: { marginBottom: '1em', color: '#666' }
+        },
+        {
+          tagName: 'ul',
+          style: { listStyle: 'none', padding: '0' },
+          children: function() {
+            return window.$todos.get().map(todo => ({
+              tagName: 'li',
+              style: {
+                padding: '0.5em',
+                border: '1px solid #eee',
+                borderRadius: '4px',
+                marginBottom: '0.5em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5em'
+              },
+              children: [
+                {
+                  tagName: 'input',
+                  attributes: {
+                    type: 'checkbox',
+                    checked: todo.completed
+                  },
+                  onchange: function() {
+                    const todos = $todos.get();
+                    const updated = todos.map(t => 
+                      t.id === todo.id ? { ...t, completed: !t.completed } : t
+                    );
+                    $todos.set(updated);
+                  }
+                },
+                {
+                  tagName: 'span',
+                  textContent: todo.text,
+                  style: {
+                    textDecoration: todo.completed ? 'line-through' : 'none',
+                    color: todo.completed ? '#999' : '#333',
+                    flex: '1'
+                  }
+                },
+                {
+                  tagName: 'button',
+                  textContent: 'Delete',
+                  style: {
+                    padding: '0.25em 0.5em',
+                    backgroundColor: '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.8em'
+                  },
+                  onclick: function() {
+                    const todos = $todos.get();
+                    $todos.set(todos.filter(t => t.id !== todo.id));
+                  }
+                }
+              ]
+            }));
+          }
+        }
+      ]
+    }
+  }
+};`;
+            editor.value = exampleDDOM;
+            showSuccess('Example DDOM application loaded!');
+        }
+
+        // Create new application template
+        function newApplication() {
+            const template = `/*
+ * New DDOM Application
+ */
+
+export default {
+  // Application state
+  $message: 'Hello, DDOM!',
+  
+  document: {
+    head: {
+      title: 'My DDOM App'
+    },
+    body: {
+      style: {
+        fontFamily: 'system-ui, sans-serif',
+        padding: '2em'
+      },
+      children: [
+        {
+          tagName: 'h1',
+          textContent: '\${window.$message}',
+          style: { color: '#333' }
+        },
+        {
+          tagName: 'button',
+          textContent: 'Click Me',
+          style: {
+            padding: '0.5em 1em',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          },
+          onclick: function() {
+            $message.set('Hello from DDOM!');
+          }
+        }
+      ]
+    }
+  }
+};`;
+            editor.value = template;
+            showSuccess('New DDOM application template created!');
+        }
+
+        // Validate DDOM syntax
+        function validateDDOM() {
+            const code = editor.value.trim();
+            if (!code) {
+                showError('Please enter some DDOM code to validate.');
+                return;
+            }
+
+            try {
+                // Basic syntax validation - check if it looks like valid JavaScript
+                new Function('return ' + code.replace(/^export\s+default\s+/, ''));
+                showSuccess('DDOM syntax is valid!');
+                
+                // Simple preview rendering
+                previewDDOM(code);
+            } catch (error) {
+                showError(`Syntax error: ${error.message}`);
+            }
+        }
+
+        // Export as JavaScript using jsesc
+        function exportAsJavaScript() {
+            const code = editor.value.trim();
+            if (!code) {
+                showError('Please enter some DDOM code to export.');
+                return;
+            }
+
+            try {
+                // Extract the DDOM object (remove export default)
+                const ddomCode = code.replace(/^export\s+default\s+/, '');
+                const ddomObject = new Function('return ' + ddomCode)();
+                
+                // Use jsesc to create clean JavaScript
+                const cleanJS = jsesc(ddomObject, {
+                    es6: true,
+                    compact: false,
+                    indent: '  '
+                });
+
+                // Create downloadable file
+                const exportedCode = `// Generated DDOM Application
+export default ${cleanJS};`;
+                
+                const blob = new Blob([exportedCode], { type: 'application/javascript' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'ddom-application.js';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                showSuccess('DDOM application exported as JavaScript!');
+            } catch (error) {
+                showError(`Export failed: ${error.message}`);
+            }
+        }
+
+        // Simple preview renderer
+        function previewDDOM(code) {
+            try {
+                const ddomCode = code.replace(/^export\s+default\s+/, '');
+                const ddom = new Function('return ' + ddomCode)();
+                
+                let previewHTML = '<div style="border: 1px solid #ddd; padding: 1em; border-radius: 4px;">';
+                previewHTML += '<h3>DDOM Structure Preview</h3>';
+                
+                if (ddom.document && ddom.document.body) {
+                    previewHTML += renderDDOMPreview(ddom.document.body);
+                } else {
+                    previewHTML += '<p>No document.body found in DDOM object</p>';
+                }
+                
+                previewHTML += '</div>';
+                previewArea.innerHTML = previewHTML;
+            } catch (error) {
+                previewArea.innerHTML = `<div class="error">Preview error: ${error.message}</div>`;
+            }
+        }
+
+        // Render DDOM structure as preview HTML
+        function renderDDOMPreview(element) {
+            if (!element) return '';
+            
+            let html = '';
+            const tagName = element.tagName || 'div';
+            
+            html += `<div style="margin: 0.5em 0; padding: 0.5em; border-left: 3px solid #007bff; background: #f8f9fa;">`;
+            html += `<strong>&lt;${tagName}&gt;</strong>`;
+            
+            if (element.textContent) {
+                html += ` <span style="color: #666;">${element.textContent}</span>`;
+            }
+            
+            if (element.children) {
+                if (Array.isArray(element.children)) {
+                    element.children.forEach(child => {
+                        html += renderDDOMPreview(child);
+                    });
+                } else if (typeof element.children === 'function') {
+                    html += ' <em>(dynamic children)</em>';
+                }
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        function showError(message) {
+            validationResult.innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        function showSuccess(message) {
+            validationResult.innerHTML = `<div class="success">${message}</div>`;
+        }
+
+        // Auto-validate on input
+        editor.addEventListener('input', () => {
+            // Clear previous validation
+            validationResult.innerHTML = '';
+        });
+
+        // Load example on page load
+        window.addEventListener('load', () => {
+            loadExample();
+        });
+    </script>
+</body>
+</html>
